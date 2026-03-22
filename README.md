@@ -1,21 +1,23 @@
 # Learning Go
 
-A personal repository for learning Go from scratch — covering fundamentals, hands-on challenges, and flashcard-based review.
+A personal repository for learning Go from scratch — from fundamentals through production-grade full-stack engineering.
 
 ## Repository Structure
 
 ```
 fundamental_go/
-├── go-flashcards/         React app with 26 flashcards across 4 difficulty levels
-└── beginner_challenges/   4 progressive Go challenges with solutions
+├── go-flashcards/             React app with 26 flashcards across 4 difficulty levels
+└── beginner_challenges/       4 progressive Go challenges with solutions
+
+go-backend-engineering/        8 challenges across 6 phases (~110–130h)
+                               interfaces → concurrency → performance → HTTP services → stress tests
+
+go-fullstack-engineering/      Full curriculum extending backend into full-stack (~250–290h)
+                               Go + Vue.js + TypeScript + Docker + CI/CD + Kubernetes
 ```
 
-## Source
+## Learning Path
 
-Based on: [Go in One Video](https://www.youtube.com/watch?v=3lazW_dSXKM)
-
-## Approach
-
-1. Watch and experiment with Go basics (syntax, types, slices, structs, methods, file I/O)
-2. Reinforce through flashcards organized by Bloom's Taxonomy
-3. Test understanding through beginner challenges of increasing complexity
+1. **Fundamentals** — Go basics, flashcards, beginner challenges ([source video](https://www.youtube.com/watch?v=3lazW_dSXKM))
+2. **Backend Engineering** — Interfaces, concurrency, memory, HTTP services, code review under pressure
+3. **Full-Stack Engineering** — TypeScript, Vue.js, testing, Docker, CI/CD, Kubernetes, capstone project
