@@ -57,61 +57,58 @@ Every production system logs events. But *where* those logs go changes depending
 A well-designed logging system should let you swap the destination without changing the code that *uses* the logger. This is exactly how Go's `io.Writer`, `log/slog`, and popular libraries like `uber-go/zap` work internally.
 
 ### 2. Goal
-Build a logging system that writes to multiple destinations using a shared interface. The rest of the application must not know or care where logs go.
+Build a logging system that can write to multiple destinations (console, file, JSON) using a common interface. The logger must be swappable — the rest of the code should not care where logs go.
 
 ### 3. Scope
-- Define a `Logger` interface with method `Log(level, message string)`
-- Implement 3 loggers satisfying `Logger`:
+- Define a `Logger` interface with at least one method: `Log(level, message string)`
+- Implement 3 concrete loggers, all satisfying the `Logger` interface:
   - `ConsoleLogger` — prints to terminal with timestamp
-  - `FileLogger` — appends to a `.log` file with pipe-separated fields
-  - `JSONLogger` — writes one JSON object per line to a `.json` file
-- Write `RunApp(l Logger)` that logs 3 events: startup, a warning, shutdown
-- Call `RunApp` with all 3 loggers from `main()`
-- Zero `if/else` on logger type inside `RunApp` — purely interface-driven
+  - `FileLogger` — writes to a `.log` file
+  - `JSONLogger` — writes structured JSON lines to a file
+- Write a function `RunApp(l Logger)` that takes any logger and logs 3 events (startup, a warning, a shutdown)
+- In `main()`, call `RunApp` three times — once with each logger type
+- No `if/else` based on logger type anywhere in `RunApp` — it must work purely through the interface
 
 ### 4. Expected Output
+Console:
 ```
 [2026-03-22 10:00:01] INFO  app started
 [2026-03-22 10:00:01] WARN  high memory usage
 [2026-03-22 10:00:01] INFO  app shutdown
 ```
+File (`app.log`):
 ```
+2026-03-22 10:00:01 | INFO  | app started
+2026-03-22 10:00:01 | WARN  | high memory usage
+2026-03-22 10:00:01 | INFO  | app shutdown
+```
+JSON (`app.json`):
+```json
 {"time":"2026-03-22T10:00:01","level":"INFO","message":"app started"}
+{"time":"2026-03-22T10:00:01","level":"WARN","message":"high memory usage"}
+{"time":"2026-03-22T10:00:01","level":"INFO","message":"app shutdown"}
 ```
 
-### 5. Why This Matters in Production
-The pattern you build here — "accept an interface, don't care about the concrete type" — is called **dependency injection**. It's how Go services are structured so they're testable. In tests, you'd pass a `MockLogger` that captures logs in memory. In production, you pass the real `FileLogger`. Same `RunApp` code, zero changes.
+### 5. Hints & Knowledge
+- In Go, interfaces are implemented **implicitly** — no `implements` keyword. If your struct has the right methods, it satisfies the interface automatically.
+- `io.Writer` is Go's most important interface: `Write(p []byte) (n int, err error)`. `os.Stdout` and `os.File` both implement it — that's why you can write to both the same way.
+- `time.Now().Format("2006-01-02 15:04:05")` — Go uses a reference time for formatting (Jan 2, 2006 = Go's birthday).
+- `encoding/json` — use `json.Marshal(struct)` to convert a struct to JSON bytes.
+- `os.OpenFile(name, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)` — open a file for appending.
 
-### 6. Common Mistakes to Avoid
-- Defining the interface in the *same* package as the implementation — put the interface where it's *used*, not where it's implemented
-- Using `interface{}` when you have a specific behavior in mind — always prefer a named interface
-- Forgetting `defer f.Close()` inside `Log()` — every `Open` must have a `Close`
-- Using `fmt.Println` inside the logger instead of writing to `io.Writer` — this makes it untestable
-
-### 7. What a Senior Would Do Differently
-- Use `io.Writer` as the underlying field instead of a filename — this makes `FileLogger` and `ConsoleLogger` the *same struct*, just initialized with different writers (`os.Stdout` vs `os.File`)
-- Add `log/slog` awareness — Go 1.21 introduced structured logging natively; a senior would know when to use it vs rolling their own
-- Make the logger thread-safe with a `sync.Mutex` for concurrent writes
-
-### 8. Hints & Knowledge
-- Interfaces are satisfied **implicitly** in Go — no `implements` keyword
-- `time.Now().Format("2006-01-02 15:04:05")` — Go's reference time is Jan 2, 2006
-- `os.OpenFile(name, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)` — append-safe file open
-- `json.Marshal(struct)` → `[]byte` of JSON
-- `fmt.Fprintf(w, ...)` writes formatted text to any `io.Writer`
-
-### 9. Sources
-- Go interfaces tour: https://go.dev/tour/methods/9
+### 6. Sources
+- Go interfaces explained: https://go.dev/tour/methods/9
 - `io.Writer`: https://pkg.go.dev/io#Writer
 - `encoding/json`: https://pkg.go.dev/encoding/json
-- `log/slog` (Go 1.21+): https://pkg.go.dev/log/slog
+- `time.Format`: https://pkg.go.dev/time#Time.Format
+- `os.OpenFile`: https://pkg.go.dev/os#OpenFile
 
-### 10. Knowledge Gained
-- ✅ Implicit interface satisfaction
-- ✅ Dependency injection via interfaces
-- ✅ `io.Writer` — the most important Go interface
-- ✅ `encoding/json` for structured output
-- ✅ The design pattern behind `net/http`, `bufio`, `os`
+### 7. Knowledge Gained
+- ✅ How Go interfaces work (implicit implementation)
+- ✅ Writing to `io.Writer` — the foundation of all Go I/O
+- ✅ `encoding/json` for structured data
+- ✅ Dependency injection via interfaces (pass behavior, not implementation)
+- ✅ The design pattern used by `net/http`, `os`, `bufio`, and most Go packages
 
 ---
 
@@ -120,14 +117,82 @@ The pattern you build here — "accept an interface, don't care about the concre
 **🕐 Expected duration: 3–4 hours**
 
 ### 1. Context
-Reading broken code is a skill as important as writing new code. In every Go team, you will do code reviews. Spotting interface errors, type mismatches, and subtle bugs before they hit production is what separates a Beginner from a intermediate-level engineer. This challenge simulates a real code review scenario.
+A junior developer tried to build a geometry calculator that computes the area of different shapes using Go interfaces. The code compiles in some places and panics in others. Your job is to fix it and make it robust.
 
 ### 2. Goal
-Find and fix all bugs in a broken geometry calculator, then extend it with a type switch.
+Fix all bugs in the provided broken code, understand why each bug exists, and add one defensive improvement using a **type switch**.
 
 ### 3. Scope
-You are given broken code (see challenge sheet). Find all 5 bugs, fix them, then add:
-- A `type switch` inside `printArea` that appends `"(is a circle)"` for circles
+Here is the broken code:
+
+```go
+package main
+
+import (
+    "fmt"
+    "math"
+)
+
+type Shape interface {
+    Area() float64
+    Describe() string
+}
+
+type Circle struct {
+    Radius float64
+}
+
+type Rectangle struct {
+    Width, Height float64
+}
+
+type Triangle struct {
+    Base, Height float64
+}
+
+func (c Circle) Area() float64 {
+    return math.Pi * c.Radius * c.Radius
+}
+
+func (r Rectangle) Area() float64 {
+    return r.Width * r.Height
+}
+
+func (r Rectangle) Describe() string {
+    return fmt.Sprintf("Rectangle %.1f x %.1f", r.Width, r.Height)
+}
+
+func (c Circle) Describe() string {
+    return fmt.Sprintf("Circle r=%.1f", c.Radius)
+}
+
+func printArea(s Shape) {
+    fmt.Printf("%s → area: %.2f\n", s.Describe, s.Area)
+}
+
+func totalArea(shapes []Shape) float64 {
+    total := 0
+    for _, s := range shapes {
+        total += s.Area()
+    }
+    return total
+}
+
+func main() {
+    shapes := []Shape{
+        Circle{Radius: 5},
+        Rectangle{Width: 3, Height: 4},
+        Triangle{Base: 6, Height: 8},
+    }
+    for _, s := range shapes {
+        printArea(s)
+    }
+    fmt.Printf("Total area: %.2f\n", totalArea(shapes))
+}
+```
+
+Find ALL bugs (there are 5), fix them, then add:
+- A `type switch` inside `printArea` that prints `"(is a circle)"` if the shape is a `Circle`
 
 ### 4. Expected Output
 ```
@@ -137,34 +202,22 @@ Triangle b=6.0 h=8.0 → area: 24.00
 Total area: 114.54
 ```
 
-### 5. Why This Matters in Production
-Interface satisfaction errors are caught at compile time in Go — which is a feature, not a bug. Understanding *why* a type fails to satisfy an interface (missing method, wrong signature, wrong receiver) is essential for working with Go's standard library interfaces like `http.Handler`, `io.Reader`, and `error`.
+### 5. Hints & Knowledge
+- Missing method on a type = does NOT satisfy the interface → compile error
+- `s.Describe` vs `s.Describe()` — calling a method needs `()`
+- `total := 0` makes `total` an `int` — can't add `float64` to it
+- Type switch syntax: `switch v := s.(type) { case Circle: ... }`
+- A `Triangle` must implement ALL methods of `Shape` to be used as one
 
-### 6. Common Mistakes to Avoid
-- Calling methods without `()` — `s.Describe` is a method value (a function), `s.Describe()` calls it
-- Initializing numeric accumulators as `int` when you need `float64` — Go won't auto-convert
-- Forgetting that ALL methods in an interface must be implemented — partial implementation = compile error
-- Using type assertion `s.(Circle)` instead of a type switch when handling multiple types
-
-### 7. What a Senior Would Do Differently
-- Define a `Perimeter() float64` method too — real geometry interfaces have multiple behaviors
-- Use `errors` to return meaningful errors from `Area()` for invalid shapes (negative dimensions)
-- Put each shape in its own file in a `shapes` package — separation of concerns
-
-### 8. Hints & Knowledge
-- Type switch: `switch v := s.(type) { case Circle: fmt.Println(v.Radius) }`
-- A type that's missing one method from an interface = compile error: "does not implement"
-- `total := 0.0` not `total := 0` for float accumulation
-
-### 9. Sources
+### 6. Sources
 - Type assertions: https://go.dev/tour/methods/15
 - Type switches: https://go.dev/tour/methods/16
 
-### 10. Knowledge Gained
-- ✅ Interface satisfaction rules — all methods must match exactly
-- ✅ Type switch for runtime type inspection
-- ✅ Reading Go compiler errors confidently
-- ✅ Code review mindset
+### 7. Knowledge Gained
+- ✅ Interface satisfaction rules — ALL methods must be implemented
+- ✅ Type assertion and type switch
+- ✅ Common interface bugs and how to spot them
+- ✅ Zero values and type mismatches
 
 ---
 
@@ -184,16 +237,18 @@ Imagine you're on a platform team. An incident just happened and you need to sca
 
 This is a fan-out/fan-in pattern — one of the two most important concurrency patterns in Go. You'll see it in log processors, data pipelines, and CI/CD systems.
 
+For myself and 42er: This is the Go equivalent of running multiple shell pipelines at the same time in your minishell — except Go manages the "processes" (goroutines) for you, and channels replace your pipes.
+
 ### 2. Goal
 Build a concurrent log file scanner that processes multiple files simultaneously, collects all ERROR lines via a channel, and prints a final report.
 
 ### 3. Scope
 - Generate 5 fake `.log` files at startup (100 lines each, random `INFO`/`WARN`/`ERROR`)
-- Launch one goroutine per file to scan it — fan-out
+- Launch one **goroutine per file** to scan it — fan-out
 - Each goroutine sends its result into a shared results channel — fan-in
 - Use `sync.WaitGroup` to know when all workers are done
 - Close the channel after all goroutines finish
-- Print a sorted final report: errors per file + total
+- Print a sorted final report: errors per file + total errors found
 - Must pass `go run -race .` with zero race conditions
 
 ### 4. Expected Output
@@ -202,13 +257,19 @@ Scanning 5 files concurrently...
 
 [worker] log_1.log → 7 errors found
 [worker] log_3.log → 3 errors found
-...
+[worker] log_2.log → 9 errors found
+[worker] log_5.log → 4 errors found
+[worker] log_4.log → 6 errors found
 
 === ERROR REPORT ===
 log_1.log : 7 errors
 log_2.log : 9 errors
+log_3.log : 3 errors
+log_4.log : 6 errors
+log_5.log : 4 errors
 Total     : 29 errors
 ```
+
 
 ### 5. Why This Matters in Production
 Fan-out/fan-in is the core of Go's concurrency model. It's used in:
