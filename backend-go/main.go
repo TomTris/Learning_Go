@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -38,7 +39,8 @@ func getMongoDatabase(conf Config) *mongo.Database {
 
 func mongoNextID(ctx context.Context, nameInCollectionCounter string, prefix string) (string, error) {
 	if db == nil {
-		log.Fatalf("db is nil")
+		slog.Error("db is nil")
+		return "", errors.New("db is nil")
 	}
 	col := db.Collection(CollectionCounters)
 	filter := bson.M{"_id": nameInCollectionCounter}

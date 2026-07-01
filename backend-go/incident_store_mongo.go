@@ -80,7 +80,7 @@ func (m *MongoIncidentStore) GetIncident(ctx context.Context, id string) (Incide
 func (m *MongoIncidentStore) AddEntry(ctx context.Context, incID string, expectedIncVersion int, entry TimelineEntry) (TimelineEntry, error) {
 	id, err := mongoNextID(ctx, CollectionCountersTimelineEntry, TimelineEntryIDPrefix)
 	if err != nil {
-		return entry, err
+		return entry, errors.New("Failed to get next Entry Id: " + err.Error())
 	}
 
 	now := time.Now()

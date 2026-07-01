@@ -25,7 +25,7 @@ func NewMemoryUserStoreWithSeed(seed []User) *MemoryUserStore {
 	return &MemoryUserStore{users: m}
 }
 
-func (s *MemoryUserStore) Create(ctx context.Context, u User) (User, error) {
+func (s *MemoryUserStore) Create(_ context.Context, u User) (User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

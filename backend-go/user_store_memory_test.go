@@ -2,71 +2,99 @@ package main
 
 import (
 	"context"
-	"errors"
 	"testing"
 )
 
-func TestGetByUsername(t *testing.T) {
-	pwd1, err1 := HashPassword("anh123")
-	pwd2, err2 := HashPassword("bernd123")
-	pwd3, err3 := HashPassword("admin123")
-	if err1 != nil || err2 != nil || err3 != nil {
-		t.Fatalf("HashPassword has problem")
-	}
+// userStoreContract exercises the UserStore interface. Any implementation
+// must pass it. newStore must return a fresh, empty store on each call —
+// including a reset ID counter, so the ID-sequence assertion holds.
+func userStoreContract(t *testing.T, newStore func() UserStore) {
+	ctx := context.Background()
 
-	var seedUsers = []User{
-		{ID: "u1", Username: "anh", Password: pwd1, Role: "engineer"},
-		{ID: "u2", Username: "bernd", Password: pwd2, Role: "engineer"},
-		{ID: "u3", Username: "admin", Password: pwd3, Role: "admin"},
-	}
-
-	users := NewMemoryUserStoreWithSeed(seedUsers)
-	for _, each := range users.users {
-		_, err := users.GetByUsername(context.Background(), each.Username)
+	t.Run("Create returns sequential IDs and preserves fields", func(t *testing.T) {
+		store := newStore()
+		u1, err := store.Create(ctx, User{Username: "tom"})
 		if err != nil {
-			t.Fatalf("expect no error")
+			t.Fatalf("create 1: %v", err)
 		}
-	}
+		u2, err := store.Create(ctx, User{Username: "jerry"})
+		if err != nil {
+			t.Fatalf("create 2: %v", err)
+		}
+		if u1.ID != UserIDPrefix+"1" || u2.ID != UserIDPrefix+"2" {
+			t.Fatalf("expected sequential IDs, got %q %q", u1.ID, u2.ID)
+		}
+		if u1.Username != "tom" {
+			t.Fatalf("username not preserved, got %q", u1.Username)
+		}
+	})
 
-	_, err := users.GetByUsername(context.Background(), "not-exist-user")
-	if errors.Is(err, ErrUserNotFound) == false {
-		t.Fatalf("expect ErrUserNotFound")
-	}
+	t.Run("GetByUsername returns created user", func(t *testing.T) {
+		store := newStore()
+		created, err := store.Create(ctx, User{Username: "tom"})
+		if err != nil {
+			t.Fatalf("create: %v", err)
+		}
+		got, err := store.GetByUsername(ctx, "tom")
+		if err != nil {
+			t.Fatalf("get: %v", err)
+		}
+		if got.ID != created.ID || got.Username != "tom" {
+			t.Fatalf("mismatch: created %+v, got %+v", created, got)
+		}
+	})
+
+	t.Run("GetByUsername not found for unknown username", func(t *testing.T) {
+		store := newStore()
+		_, err := store.GetByUsername(ctx, "nobody")
+		if err != ErrUserNotFound {
+			t.Fatalf("expected ErrUserNotFound, got %v", err)
+		}
+	})
+
+	t.Run("Create rejects duplicate username", func(t *testing.T) {
+		store := newStore()
+		if _, err := store.Create(ctx, User{Username: "tom"}); err != nil {
+			t.Fatalf("first create: %v", err)
+		}
+		_, err := store.Create(ctx, User{Username: "tom"})
+		if err != ErrUserAlreadyExist {
+			t.Fatalf("expected ErrUserAlreadyExist, got %v", err)
+		}
+	})
+
+	t.Run("Create allows distinct usernames", func(t *testing.T) {
+		store := newStore()
+		if _, err := store.Create(ctx, User{Username: "tom"}); err != nil {
+			t.Fatalf("create tom: %v", err)
+		}
+		if _, err := store.Create(ctx, User{Username: "jerry"}); err != nil {
+			t.Fatalf("create jerry: %v", err)
+		}
+	})
 }
 
-func TestCreateUser(t *testing.T) {
-
-	pwd1, err1 := HashPassword("anh123")
-	pwd2, err2 := HashPassword("bernd123")
-	pwd3, err3 := HashPassword("admin123")
-	if err1 != nil || err2 != nil || err3 != nil {
-		t.Fatalf("HashPassword has problem")
-	}
-
-	var seedUsers = []User{
-		{ID: "u1", Username: "anh", Password: pwd1, Role: "engineer"},
-		{ID: "u2", Username: "bernd", Password: pwd2, Role: "engineer"},
-		{ID: "u3", Username: "admin", Password: pwd3, Role: "admin"},
-	}
-
-	users := NewMemoryUserStoreWithSeed([]User{})
-
-	t.Run("normal creation with sequential IDs", func(t *testing.T) {
-		u0, err0 := users.Create(t.Context(), seedUsers[0])
-		u1, err1 := users.Create(t.Context(), seedUsers[1])
-		if err0 != nil || err1 != nil {
-			t.Fatalf("expect no error")
-		}
-		if u0.ID != UserIDPrefix+"1" || u1.ID != UserIDPrefix+"2" {
-			t.Fatalf("userID not as expected")
-		}
+func TestUserStoreMemoryContract(t *testing.T) {
+	userStoreContract(t, func() UserStore {
+		NewMemoryUserStore, _ := NewMemoryUserStore()
+		return NewMemoryUserStore
 	})
+}
 
-	t.Run("create an user with an existing username", func(t *testing.T) {
-		_, err := users.Create(t.Context(), seedUsers[1])
-		if errors.Is(err, ErrUserAlreadyExist) == false {
-			t.Fatalf("expect error `%v`, get `%v`", ErrUserAlreadyExist, err)
-		}
+func setupUserStoreMongoContractEnv(t *testing.T) *MongoUserStore {
+	t.Helper()
+	config := loadConfig()
+	db = getMongoDatabase(config)
+	db.Drop(t.Context()) // full drop resets ID counter and removes indexes
+	store, err := NewMongoUserStore(t.Context(), db.Collection(CollectionUsers))
+	if err != nil {
+		t.Fatalf("new mongo user store: %v", err)
+	}
+	return store
+}
+
+func TestUserStoreMongoContract(t *testing.T) {
+	userStoreContract(t, func() UserStore {
+		return setupUserStoreMongoContractEnv(t)
 	})
-
 }

@@ -1,4 +1,4 @@
-run:
+run: mongo-up
 	cd ./frontend-vue && npm install && npm audit fix && npm run build
 	go -C backend-go run .
 
