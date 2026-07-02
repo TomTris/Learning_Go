@@ -54,8 +54,12 @@ func getRouter(
 	admin.HandleFunc("GET /flags", ResponseMiddleware(AuthAdminOnlyMiddleware(flagHandler.ListAllFlag)))
 	admin.HandleFunc("PATCH /flags/{name}", ResponseMiddleware(AuthAdminOnlyMiddleware(flagHandler.UpdateFlag)))
 	admin.HandleFunc("GET /flags/{name}/evaluate", ResponseMiddleware(AuthAdminOnlyMiddleware(flagHandler.Evaluate)))
+
+	// oncall
 	admin.HandleFunc("POST /oncall", ResponseMiddleware(AuthAdminOnlyMiddleware(onCallHandler.CreateShift)))
-	admin.HandleFunc("GET /oncall/current", ResponseMiddleware(AuthAdminOnlyMiddleware(onCallHandler.CurrentOnCall)))
+	admin.HandleFunc("PATCH /oncall/{id}", ResponseMiddleware(AuthAdminOnlyMiddleware(onCallHandler.UpdateShift)))
+	protected.HandleFunc("GET /oncall/current", ResponseMiddleware(onCallHandler.CurrentOnCall))
+	protected.HandleFunc("GET /oncall", ResponseMiddleware(onCallHandler.ListOnCalls))
 
 	// metrics, health and ready
 	public := http.NewServeMux()

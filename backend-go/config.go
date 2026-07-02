@@ -74,6 +74,8 @@ const (
 	TimelineEntryIDPrefix    = "TLE-"
 	OnCallShiftEntryIDPrefix = "ONc-"
 	UserIDPrefix             = "Usr-"
+
+	ARealBrcyptHasedPassword = "$2a$12$gpwXpFXAYxo8U3RoKwYQR.CRfVf6zJzH0TcbR.L0rSrRLD9S00d/e"
 )
 
 // Incident Severity

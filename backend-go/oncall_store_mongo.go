@@ -8,6 +8,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type MongoOnCallStore struct {
@@ -52,21 +53,23 @@ func (s *MongoOnCallStore) CurrentOnCall(ctx context.Context, service string) (s
 	return entry.Username, nil
 }
 
-func (s *MongoOnCallStore) ListOnCalls(ctx context.Context, startsAt *time.Time, endsAt *time.Time) ([]OnCallShiftEntry, error) {
-	startCond := bson.M{}
-	if startsAt != nil {
-		startCond["$gte"] = *startsAt
-	}
-	if endsAt != nil {
-		startCond["$lt"] = *endsAt
-	}
-
+func (s *MongoOnCallStore) ListOnCalls(ctx context.Context, from *time.Time, to *time.Time) ([]OnCallShiftEntry, error) {
 	filter := bson.M{}
-	if len(startCond) > 0 {
-		filter["starts_at"] = startCond
+
+	if from != nil {
+		// normalize: from -> start of its minute
+		f := from.Truncate(time.Minute)
+		// on-call overlaps only if it ends at or after `from`: end >= f
+		filter["ends_at"] = bson.M{"$gte": f}
+	}
+	if to != nil {
+		// normalize: to -> end of its minute (:59.999999999)
+		t := to.Truncate(time.Minute).Add(time.Minute - time.Nanosecond)
+		// on-call overlaps only if it starts at or before `to`: start <= t
+		filter["starts_at"] = bson.M{"$lte": t}
 	}
 
-	cursor, err := s.col.Find(ctx, filter)
+	cursor, err := s.col.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "starts_at", Value: 1}}))
 	if err != nil {
 		return nil, fmt.Errorf("list on-calls query error: %w", err)
 	}

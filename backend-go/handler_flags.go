@@ -4,10 +4,65 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 )
 
 type FlagHandler struct {
 	store FlagStore
+}
+
+type FeatureFlag struct {
+	Name     string   `json:"name"`
+	Enabled  bool     `json:"enabled"`
+	Rollout  int      `json:"rollout"`  // 0–100, percentage of users who see the feature
+	Variants []string `json:"variants"` // e.g., ["control", "variant_a", "variant_b"]
+}
+
+func (f *FeatureFlag) Validate() error {
+	if strings.TrimSpace(f.Name) == "" {
+		return ErrBadRequest
+	}
+	if f.Rollout < 0 || f.Rollout > 100 {
+		return ErrBadRequest
+	}
+	if len(f.Variants) == 0 {
+		return ErrBadRequest
+	}
+	variants := make(map[string]bool)
+	for _, variant := range f.Variants {
+		if strings.TrimSpace(variant) == "" || variants[variant] == true {
+			return ErrBadRequest
+		}
+		variants[variant] = true
+	}
+	return nil
+}
+
+type FeatureFlagUpdate struct {
+	Name    string `json:"name"`
+	Enabled *bool  `json:"enabled"`
+	Rollout *int   `json:"rollout"` // 0–100, percentage of users who see the feature
+}
+
+func (u *FeatureFlagUpdate) Validate() error {
+	if strings.TrimSpace(u.Name) == "" {
+		return errors.New("Bad Flag Name")
+	}
+	if u.Enabled == nil && u.Rollout == nil {
+		return errors.New("both enabled and rollout are empty")
+	}
+	if u.Rollout != nil && (*u.Rollout < 0 || *u.Rollout > 100) {
+		return errors.New("invalid rollout")
+	}
+	return nil
+}
+
+type FlagEvaluateAnswer struct {
+	Name      string  `json:"name"`
+	UserID    string  `json:"user_id"`
+	Enabled   bool    `json:"enabled"`
+	InRollout bool    `json:"in_rollout"`
+	Variant   *string `json:"variants"`
 }
 
 func (flagHandler *FlagHandler) CreateFlag(r *http.Request) (*AppResponse, *AppError) {

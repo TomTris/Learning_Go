@@ -26,3 +26,11 @@ https://stackoverflow.com/questions/129329/optimistic-vs-pessimistic-locking
 So, in this case, versioning will solve this case with optimistic locking. Incident-handoff case is a low contention case. In usual case, everything works, no interuption. If races happen, they will be detected and rejected by returning Conflict and the user owns the next step of what to do. This is not expensive because the race barely happens. And this one also works easily even with scaling (multiple instances).
 
 On other side, Pessimistic locking is suitable with high-volumn systems or cases (flash-sale i guess), using not mutex (process-locking-level), but an external reliable service. 
+
+## Why VerifyPassword(ARealBrcyptHasedPassword, "dummy-password")?
+Because, An attacker can measure the response time:
+- fast = no such user
+- slow = user exists
+=> This leaks which usernames are registered.
+
+Note: In current implementation, an acocunt is registered directly -> attacker can try to register an account to detect this. But if registration requires an E-mail and send confirmation to that E-Mail -> no problem.

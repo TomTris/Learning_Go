@@ -10,6 +10,154 @@ import (
 	"testing"
 )
 
+func TestFeatureFlag_Validate(t *testing.T) {
+	valid := func() FeatureFlag {
+		return FeatureFlag{
+			Name:     "dark_mode",
+			Enabled:  true,
+			Rollout:  50,
+			Variants: []string{"control", "variant_a"},
+		}
+	}
+
+	t.Run("valid flag", func(t *testing.T) {
+		f := valid()
+		if err := f.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("empty name", func(t *testing.T) {
+		f := valid()
+		f.Name = ""
+		if err := f.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("rollout negative", func(t *testing.T) {
+		f := valid()
+		f.Rollout = -1
+		if err := f.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("rollout over 100", func(t *testing.T) {
+		f := valid()
+		f.Rollout = 101
+		if err := f.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("rollout boundary 0", func(t *testing.T) {
+		f := valid()
+		f.Rollout = 0
+		if err := f.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("rollout boundary 100", func(t *testing.T) {
+		f := valid()
+		f.Rollout = 100
+		if err := f.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("nil variants", func(t *testing.T) {
+		f := valid()
+		f.Variants = nil
+		if err := f.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("0 variants", func(t *testing.T) {
+		f := valid()
+		f.Variants = []string{}
+		if err := f.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("empty variant string", func(t *testing.T) {
+		f := valid()
+		f.Variants = []string{"control", ""}
+		if err := f.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("duplicate variants", func(t *testing.T) {
+		f := valid()
+		f.Variants = []string{"control", "control"}
+		if err := f.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+}
+
+func TestFeatureFlagUpdate_Validate(t *testing.T) {
+	t.Run("valid enabled only", func(t *testing.T) {
+		u := FeatureFlagUpdate{Name: "flag1", Enabled: new(true)}
+		if err := u.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("valid rollout only", func(t *testing.T) {
+		u := FeatureFlagUpdate{Name: "flag1", Rollout: new(50)}
+		if err := u.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("empty name", func(t *testing.T) {
+		u := FeatureFlagUpdate{Name: "", Enabled: new(true)}
+		if err := u.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("both nil", func(t *testing.T) {
+		u := FeatureFlagUpdate{Name: "flag1"}
+		if err := u.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("rollout negative", func(t *testing.T) {
+		u := FeatureFlagUpdate{Name: "flag1", Rollout: new(-1)}
+		if err := u.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("rollout over 100", func(t *testing.T) {
+		u := FeatureFlagUpdate{Name: "flag1", Rollout: new(101)}
+		if err := u.Validate(); err == nil {
+			t.Error("expected error")
+		}
+	})
+
+	t.Run("rollout boundary 0", func(t *testing.T) {
+		u := FeatureFlagUpdate{Name: "flag1", Rollout: new(0)}
+		if err := u.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("rollout boundary 100", func(t *testing.T) {
+		u := FeatureFlagUpdate{Name: "flag1", Rollout: new(100)}
+		if err := u.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+}
+
 func TestCreateFlag(t *testing.T) {
 	validFeatureFlag := func() FeatureFlag {
 		return FeatureFlag{

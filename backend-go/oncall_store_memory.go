@@ -45,19 +45,28 @@ func (s *InMemoryOnCallStore) CurrentOnCall(ctx context.Context, service string)
 	return "", OnCallShiftEntryNotFound
 }
 
-func (s *InMemoryOnCallStore) ListOnCalls(ctx context.Context, startsAt *time.Time, endsAt *time.Time) ([]OnCallShiftEntry, error) {
+func (s *InMemoryOnCallStore) ListOnCalls(ctx context.Context, from *time.Time, to *time.Time) ([]OnCallShiftEntry, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	var lo, hi *time.Time
+	if from != nil {
+		f := from.Truncate(time.Minute) // start of the minute
+		lo = &f
+	}
+	if to != nil {
+		t := to.Truncate(time.Minute).Add(time.Minute - time.Nanosecond) // end of the minute
+		hi = &t
+	}
+
 	entries := []OnCallShiftEntry{}
 	for _, each := range s.OnCallEntries {
-		// startsat >= startsAt
-		if startsAt != nil && each.StartsAt.Before(*startsAt) {
-			continue
+		// overlap requires: end >= from AND start <= to
+		if lo != nil && each.EndsAt.Before(*lo) {
+			continue // end < from -> no overlap
 		}
-		// startsat < endsAt
-		if endsAt != nil && !each.StartsAt.Before(*endsAt) {
-			continue
+		if hi != nil && each.StartsAt.After(*hi) {
+			continue // start > to -> no overlap
 		}
 		entries = append(entries, each)
 	}

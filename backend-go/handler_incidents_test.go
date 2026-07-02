@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -15,6 +16,428 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+func TestCreateIncidentRequest_Validate(t *testing.T) {
+	valid := func() CreateIncidentRequest {
+		return CreateIncidentRequest{
+			Title: "outage", Service: "api", Severity: "SEV1",
+		}
+	}
+
+	t.Run("valid request", func(t *testing.T) {
+		r := valid()
+		if err := r.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("empty title", func(t *testing.T) {
+		r := valid()
+		r.Title = ""
+		if !errors.Is(r.Validate(), ErrNoTitle) {
+			t.Error("expected ErrNoTitle")
+		}
+	})
+
+	t.Run("whitespace title", func(t *testing.T) {
+		r := valid()
+		r.Title = "   "
+		if !errors.Is(r.Validate(), ErrNoTitle) {
+			t.Error("expected ErrNoTitle")
+		}
+	})
+
+	t.Run("empty service", func(t *testing.T) {
+		r := valid()
+		r.Service = ""
+		if !errors.Is(r.Validate(), ErrNoService) {
+			t.Error("expected ErrNoService")
+		}
+	})
+
+	t.Run("invalid severity", func(t *testing.T) {
+		r := valid()
+		r.Severity = "SEV4"
+		if !errors.Is(r.Validate(), ErrInvalidSeverity) {
+			t.Error("expected ErrInvalidSeverity")
+		}
+	})
+
+	t.Run("trims whitespace", func(t *testing.T) {
+		r := CreateIncidentRequest{
+			Title: "  outage  ", Service: "  api  ", Severity: "  SEV1  ",
+		}
+		r.Validate()
+		if r.Title != "outage" {
+			t.Errorf("Title not trimmed: %q", r.Title)
+		}
+		if r.Service != "api" {
+			t.Errorf("Service not trimmed: %q", r.Service)
+		}
+	})
+}
+
+func TestTimelineEntry_Validate(t *testing.T) {
+	valid := func() TimelineEntry {
+		return TimelineEntry{Author: "anh", Type: OBSERVATION, Text: "cpu high"}
+	}
+
+	t.Run("valid entry", func(t *testing.T) {
+		e := valid()
+		if err := e.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	// t.Run("empty author", func(t *testing.T) {
+	// 	e := valid()
+	// 	e.Author = "   "
+	// 	if !errors.Is(e.Validate(), ErrNoAuthor) {
+	// 		t.Error("expected ErrNoAuthor")
+	// 	}
+	// })
+
+	t.Run("invalid type", func(t *testing.T) {
+		e := valid()
+		e.Type = "active"
+		if !errors.Is(e.Validate(), ErrBadEntryType) {
+			t.Error("expected ErrBadEntryType")
+		}
+
+		e = valid()
+		e.Type = "invalid"
+		if !errors.Is(e.Validate(), ErrBadEntryType) {
+			t.Error("expected ErrBadEntryType")
+		}
+	})
+
+	t.Run("empty text", func(t *testing.T) {
+		e := valid()
+		e.Text = ""
+		if !errors.Is(e.Validate(), ErrNoText) {
+			t.Error("expected ErrNoText")
+		}
+	})
+
+	t.Run("all valid entry types", func(t *testing.T) {
+		for _, typ := range []string{OBSERVATION, ACTION, DISCOVERY, OPEN_QUESTION, STATE_CHANGE} {
+			e := valid()
+			e.Type = typ
+			if err := e.Validate(); err != nil {
+				t.Errorf("type %s should be valid, got %v", typ, err)
+			}
+		}
+	})
+}
+
+func TestIncidentFilter_Validate(t *testing.T) {
+	t.Run("empty filter valid", func(t *testing.T) {
+		f := IncidentFilter{}
+		if err := f.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("valid status", func(t *testing.T) {
+		for _, s := range []string{TRIGGERED, ACKNOWLEDGED, INVESTIGATING, MITIGATED, RESOLVED, "active"} {
+			f := IncidentFilter{Status: s}
+			if err := f.Validate(); err != nil {
+				t.Errorf("status %s should be valid, got %v", s, err)
+			}
+		}
+	})
+
+	t.Run("invalid status", func(t *testing.T) {
+		f := IncidentFilter{Status: "abc"}
+		if !errors.Is(f.Validate(), ErrBadIncidentStatus) {
+			t.Error("expected ErrBadIncidentStatus")
+		}
+	})
+
+	t.Run("service passes through", func(t *testing.T) {
+		f := IncidentFilter{Service: "api"}
+		if err := f.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("empty service not fail", func(t *testing.T) {
+		f := IncidentFilter{Service: "  "}
+		if err := f.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+}
+
+func TestIncidentUpdate_Validate(t *testing.T) {
+	t.Run("valid status", func(t *testing.T) {
+		u := IncidentUpdate{Status: new(RESOLVED)}
+		if err := u.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("invalid status", func(t *testing.T) {
+		u := IncidentUpdate{Status: new("active")}
+		if !errors.Is(u.Validate(), ErrBadIncidentStatus) {
+			t.Error("expected ErrBadIncidentStatus")
+		}
+	})
+
+	t.Run("valid severity", func(t *testing.T) {
+		u := IncidentUpdate{Severity: new(SEV2)}
+		if err := u.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("invalid severity", func(t *testing.T) {
+		u := IncidentUpdate{Severity: new("SEV9")}
+		if !errors.Is(u.Validate(), ErrInvalidSeverity) {
+			t.Error("expected ErrInvalidSeverity")
+		}
+	})
+
+	t.Run("valid on_call", func(t *testing.T) {
+		u := IncidentUpdate{OnCall: new("bernd")}
+		if err := u.Validate(); err != nil {
+			t.Errorf("expected no error, got %v", err.Error())
+		}
+	})
+
+	t.Run("empty on_call", func(t *testing.T) {
+		u := IncidentUpdate{OnCall: new("")}
+		if !errors.Is(u.Validate(), ErrOnCall) {
+			t.Error("expected ErrOnCall")
+		}
+	})
+
+	t.Run("all fields nil", func(t *testing.T) {
+		u := IncidentUpdate{}
+		if !errors.Is(u.Validate(), ErrBadRequest) {
+			t.Error("expected ErrBadRequest")
+		}
+	})
+
+	t.Run("set many fields", func(t *testing.T) {
+		u := IncidentUpdate{
+			Status:   new(RESOLVED),
+			Severity: new(SEV2),
+			OnCall:   new("bernd1111"),
+		}
+		u.Validate()
+		if *u.Status != RESOLVED {
+			t.Errorf("expected RESOLVED, got %v", u.Status)
+		}
+		if *u.Severity != SEV2 {
+			t.Errorf("expected SEV, got %v", u.Severity)
+		}
+		if *u.OnCall != "bernd1111" {
+			t.Errorf("expected bernd1111, get %v", u.OnCall)
+		}
+	})
+}
+
+func TestBuildHandoffBrief(t *testing.T) {
+	now := time.Now()
+
+	t.Run("counts actions and open questions", func(t *testing.T) {
+		inc := Incident{
+			Severity:  SEV1,
+			Status:    TRIGGERED,
+			Service:   "api",
+			CreatedAt: now,
+			Entries: []TimelineEntry{
+				{Author: "anh", Type: ACTION, Text: "restarted"},
+				{Author: "anh", Type: OPEN_QUESTION, Text: "why?"},
+				{Author: "anh", Type: OBSERVATION, Text: "cpu high"},
+				{Author: "anh", Type: ACTION, Text: "scaled up"},
+			},
+		}
+		brief := buildHandoffBrief(inc, nil, "")
+
+		if brief.TakenActions != 2 {
+			t.Errorf("TakenActions expected 2, got %d", brief.TakenActions)
+		}
+		if brief.OpenQuestion != 1 {
+			t.Errorf("OpenQuestion expected 1, got %d", brief.OpenQuestion)
+		}
+		if brief.TotalEntry != 4 {
+			t.Errorf("TotalEntry expected 4, got %d", brief.TotalEntry)
+		}
+	})
+
+	t.Run("handoff count tracks author changes", func(t *testing.T) {
+		inc := Incident{
+			CreatedAt: now,
+			Entries: []TimelineEntry{
+				{Author: "anh", Type: OBSERVATION, Text: "a"},
+				{Author: "anh", Type: OBSERVATION, Text: "b"},
+				{Author: "bernd", Type: OBSERVATION, Text: "c"},
+				{Author: "anh", Type: OBSERVATION, Text: "d"},
+			},
+		}
+		brief := buildHandoffBrief(inc, nil, "")
+
+		if brief.HandoffCount != 2 {
+			t.Errorf("HandoffCount expected 2, got %d", brief.HandoffCount)
+		}
+	})
+
+	t.Run("single author zero handoffs", func(t *testing.T) {
+		inc := Incident{
+			CreatedAt: now,
+			Entries: []TimelineEntry{
+				{Author: "anh", Type: OBSERVATION, Text: "a"},
+				{Author: "anh", Type: OBSERVATION, Text: "b"},
+			},
+		}
+		brief := buildHandoffBrief(inc, nil, "")
+
+		if brief.HandoffCount != 0 {
+			t.Errorf("HandoffCount expected 0, got %d", brief.HandoffCount)
+		}
+	})
+
+	t.Run("empty entries", func(t *testing.T) {
+		inc := Incident{
+			CreatedAt: now,
+			Entries:   []TimelineEntry{},
+		}
+		brief := buildHandoffBrief(inc, nil, "")
+
+		if brief.TotalEntry != 0 {
+			t.Errorf("TotalEntry expected 0, got %d", brief.TotalEntry)
+		}
+		if brief.HandoffCount != 0 {
+			t.Errorf("HandoffCount expected 0, got %d", brief.HandoffCount)
+		}
+	})
+
+	t.Run("maps incident fields correctly", func(t *testing.T) {
+		inc := Incident{
+			Severity:  SEV2,
+			Status:    INVESTIGATING,
+			Service:   "payments",
+			CreatedAt: now.Add(-30 * time.Minute),
+			Entries:   []TimelineEntry{},
+		}
+		brief := buildHandoffBrief(inc, nil, "")
+
+		if brief.Severity != SEV2 {
+			t.Errorf("Severity expected %s, got %s", SEV2, brief.Severity)
+		}
+		if brief.Status != INVESTIGATING {
+			t.Errorf("Status expected %s, got %s", INVESTIGATING, brief.Status)
+		}
+		if brief.Service != "payments" {
+			t.Errorf("Service expected payments, got %s", brief.Service)
+		}
+		if brief.ElapsedMinute < 29 || brief.ElapsedMinute > 31 {
+			t.Errorf("ElapsedMinute expected ~30, got %d", brief.ElapsedMinute)
+		}
+		if !brief.CreatedAt.Equal(inc.CreatedAt) {
+			t.Errorf("CreatedAt mismatch")
+		}
+	})
+
+	t.Run("nil flagStore skips detailed brief", func(t *testing.T) {
+		inc := Incident{
+			CreatedAt: now,
+			Entries:   []TimelineEntry{{Author: "anh", Type: ACTION, Text: "a"}},
+		}
+		brief := buildHandoffBrief(inc, nil, "")
+
+		if brief.TakenActionsList != nil {
+			t.Error("expected nil TakenActionsList")
+		}
+		if brief.OpenQuestionList != nil {
+			t.Error("expected nil OpenQuestionList")
+		}
+	})
+
+	t.Run("detailed brief when flag enabled", func(t *testing.T) {
+		fs := CreateFlagStore()
+		fs.Create(FeatureFlag{
+			Name:     "detailed_handoff_brief",
+			Enabled:  true,
+			Rollout:  100,
+			Variants: []string{"detailed"},
+		})
+		inc := Incident{
+			CreatedAt: now,
+			Entries: []TimelineEntry{
+				{Author: "anh", Type: ACTION, Text: "restarted"},
+				{Author: "anh", Type: OPEN_QUESTION, Text: "why?"},
+			},
+		}
+		brief := buildHandoffBrief(inc, &fs, "user1")
+
+		if brief.TakenActionsList == nil {
+			t.Fatal("expected non-nil TakenActionsList")
+		}
+		if len(*brief.TakenActionsList) != 1 {
+			t.Errorf("expected 1 action, got %d", len(*brief.TakenActionsList))
+		}
+		if brief.OpenQuestionList == nil {
+			t.Fatal("expected non-nil OpenQuestionList")
+		}
+		if len(*brief.OpenQuestionList) != 1 {
+			t.Errorf("expected 1 question, got %d", len(*brief.OpenQuestionList))
+		}
+	})
+
+	t.Run("no detailed brief when flag disabled", func(t *testing.T) {
+		fs := CreateFlagStore()
+		fs.Create(FeatureFlag{
+			Name:     "detailed_handoff_brief",
+			Enabled:  false,
+			Rollout:  100,
+			Variants: []string{"detailed"},
+		})
+		inc := Incident{
+			CreatedAt: now,
+			Entries:   []TimelineEntry{{Author: "anh", Type: ACTION, Text: "a"}},
+		}
+		brief := buildHandoffBrief(inc, &fs, "user1")
+
+		if brief.TakenActionsList != nil {
+			t.Error("expected nil TakenActionsList")
+		}
+	})
+
+	t.Run("no detailed brief when flag not found", func(t *testing.T) {
+		fs := CreateFlagStore()
+		inc := Incident{
+			CreatedAt: now,
+			Entries:   []TimelineEntry{{Author: "anh", Type: ACTION, Text: "a"}},
+		}
+		brief := buildHandoffBrief(inc, &fs, "user1")
+
+		if brief.TakenActionsList != nil {
+			t.Error("expected nil TakenActionsList")
+		}
+	})
+
+	t.Run("no detailed brief when variant is not detailed", func(t *testing.T) {
+		fs := CreateFlagStore()
+		fs.Create(FeatureFlag{
+			Name:     "detailed_handoff_brief",
+			Enabled:  true,
+			Rollout:  100,
+			Variants: []string{"control"},
+		})
+		inc := Incident{
+			CreatedAt: now,
+			Entries:   []TimelineEntry{{Author: "anh", Type: ACTION, Text: "a"}},
+		}
+		brief := buildHandoffBrief(inc, &fs, "user1")
+
+		if brief.TakenActionsList != nil {
+			t.Error("expected nil TakenActionsList")
+		}
+	})
+}
 
 func TestMarshalNewEntryEvent(t *testing.T) {
 	timelineEntry := TimelineEntry{

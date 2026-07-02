@@ -63,6 +63,7 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) (*App
 	user, err := h.Users.GetByUsername(r.Context(), u.Username)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
+			VerifyPassword(ARealBrcyptHasedPassword, "dummy-password") // needed, so response time as equally same, no matter user exists or not
 			return nil, Unauthorized(errors.New("Username or Password not correct"))
 		}
 		return nil, Unauthorized(err)

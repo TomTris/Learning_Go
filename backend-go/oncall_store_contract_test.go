@@ -100,20 +100,31 @@ func onCallStoreContract(t *testing.T, newStore func() OnCallStore) {
 		}
 	})
 
-	t.Run("ListOnCalls lower bound inclusive", func(t *testing.T) {
+	t.Run("ListOnCalls no bounds returns all", func(t *testing.T) {
 		store := newStore()
-		seedThree(t, ctx, store, base) // StartsAt at base+0h, +1h, +2h
+		seedThree(t, ctx, store, base)
+		got, err := store.ListOnCalls(ctx, nil, nil)
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		if len(got) != 3 {
+			t.Fatalf("expected 3, got %d", len(got))
+		}
+	})
+
+	t.Run("ListOnCalls from bound keeps shifts ending at or after from", func(t *testing.T) {
+		store := newStore()
+		seedThree(t, ctx, store, base) // ua[0h,0h30m] ub[1h,1h30m] uc[2h,2h30m]
 		from := base.Add(1 * time.Hour)
 		got, err := store.ListOnCalls(ctx, &from, nil)
 		if err != nil {
 			t.Fatalf("list: %v", err)
 		}
-		if len(got) != 2 {
-			t.Fatalf("expected 2, got %d", len(got))
-		}
+		// ua ends at 0h30m < 1h -> excluded; ub, uc kept
+		assertUsernames(t, got, "ub", "uc")
 	})
 
-	t.Run("ListOnCalls upper bound exclusive", func(t *testing.T) {
+	t.Run("ListOnCalls to bound keeps shifts starting at or before to's minute", func(t *testing.T) {
 		store := newStore()
 		seedThree(t, ctx, store, base)
 		to := base.Add(2 * time.Hour)
@@ -121,12 +132,11 @@ func onCallStoreContract(t *testing.T, newStore func() OnCallStore) {
 		if err != nil {
 			t.Fatalf("list: %v", err)
 		}
-		if len(got) != 2 {
-			t.Fatalf("expected 2, got %d", len(got))
-		}
+		// to normalized to 2h:59.999 -> uc (starts 2h) included
+		assertUsernames(t, got, "ua", "ub", "uc")
 	})
 
-	t.Run("ListOnCalls both bounds half-open window", func(t *testing.T) {
+	t.Run("ListOnCalls both bounds returns overlapping shifts", func(t *testing.T) {
 		store := newStore()
 		seedThree(t, ctx, store, base)
 		from := base.Add(1 * time.Hour)
@@ -135,12 +145,22 @@ func onCallStoreContract(t *testing.T, newStore func() OnCallStore) {
 		if err != nil {
 			t.Fatalf("list: %v", err)
 		}
-		if len(got) != 1 {
-			t.Fatalf("expected 1, got %d", len(got))
+		// ua excluded (ends before from); ub and uc overlap [1h, 2h:59.999]
+		assertUsernames(t, got, "ub", "uc")
+	})
+
+	t.Run("ListOnCalls excludes shift entirely before window", func(t *testing.T) {
+		store := newStore()
+		seedThree(t, ctx, store, base)
+		from := base.Add(90 * time.Minute) // 1h30m
+		to := base.Add(3 * time.Hour)
+		got, err := store.ListOnCalls(ctx, &from, &to)
+		if err != nil {
+			t.Fatalf("list: %v", err)
 		}
-		if got[0].StartsAt.Equal(base.Add(1*time.Hour)) == false {
-			t.Fatalf("wrong entry: StartsAt %v", got[0].StartsAt)
-		}
+		// ua ends 0h30m, ub ends 1h30m == from (>= so kept), uc kept
+		// ub: EndsAt 1h30m >= from 1h30m -> included (boundary inclusive)
+		assertUsernames(t, got, "ub", "uc")
 	})
 
 	t.Run("UpdateOnCall replaces existing", func(t *testing.T) {
@@ -193,4 +213,28 @@ func seedThree(t *testing.T, ctx context.Context, store OnCallStore, base time.T
 			t.Fatalf("seed %d: %v", i, err)
 		}
 	}
+}
+
+func assertUsernames(t *testing.T, got []OnCallShiftEntry, want ...string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("expected %d entries %v, got %d %+v", len(want), want, len(got), usernames(got))
+	}
+	set := make(map[string]bool, len(got))
+	for _, e := range got {
+		set[e.Username] = true
+	}
+	for _, w := range want {
+		if !set[w] {
+			t.Fatalf("expected username %q in result, got %v", w, usernames(got))
+		}
+	}
+}
+
+func usernames(entries []OnCallShiftEntry) []string {
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = e.Username
+	}
+	return out
 }
