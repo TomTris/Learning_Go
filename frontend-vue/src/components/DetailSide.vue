@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { whoAmI } from '@/api';
-import type { Incident, IncidentStatus, Severity, UserContext } from '@/types';
-import { makeEmptyUserContext } from '@/utils/user';
-import { computed, onMounted, ref, watch } from 'vue';
+import { useAuth } from '@/stores/auth';
+import type { Incident, IncidentStatus, Severity } from '@/types';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{
     inc: Incident | undefined;
@@ -13,7 +12,7 @@ const emit = defineEmits<{
     'updateIncident' : [payload : {severity: Severity, status: IncidentStatus, on_call: string}]
 }>()
 
-const identity = ref<UserContext>(makeEmptyUserContext())
+const auth = useAuth()
 const updateOnCall = ref('')
 const updateSeverity = ref<Severity>("SEV1")
 const updateStatus = ref<IncidentStatus>("triggered")
@@ -28,16 +27,6 @@ watch(
   },
   { immediate: true }
 )
-
-onMounted( async() => {
-  try {
-    identity.value = await whoAmI()
-  } catch (e) {
-      alert('Something is wrong.\n' + (e as Error).message)
-      window.location.href = "/"
-  }
-})
-
 
 const totalEntry = computed(() => props.inc?.entries.length || 0)
 const takenActions = computed(() => props.inc?.entries.filter((e) => e.type == "action").length || 0)
@@ -63,13 +52,11 @@ function onIncidentUpdate() {
     emit('updateIncident', {severity: updateSeverity.value, status: updateStatus.value, on_call: updateOnCall.value})
 }
 
-function isIncidentOwner() : boolean {
-  if (identity.value.role == "admin") {
-    return true
-  }
-  if (identity.value.role == "engineer" && identity.value.username == props.inc?.on_call) {
-    return true
-  }
+function isIncidentOwner(): boolean {
+  const u = auth.user
+  if (!u) return false
+  if (u.role === "admin") return true
+  if (u.role === "engineer" && u.username === props.inc?.on_call) return true
   return false
 }
 

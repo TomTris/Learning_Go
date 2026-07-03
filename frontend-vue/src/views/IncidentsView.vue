@@ -1,41 +1,31 @@
 <script setup lang="ts">
-import { createIncident, isAuthenticated, loadIncidents, logout } from '@/api';
-import AppHeader from '@/components/AppHeader.vue';
+import { loadIncidents } from '@/api';
 import IncidentListItem from '@/components/IncidentListItem.vue';
-import type { Severity, CreateIncidentRequest, Incident } from '@/types';
+import type { Incident } from '@/types';
 import { computed, onMounted, ref } from 'vue';
+
 const incidents = ref<Incident[]>([])
 
-async function handleLogout() {
-  await logout()
-  window.location.href = "/"
-}
-
-onMounted(async() => {
-  if (await isAuthenticated() == false) {
-    window.location.href = "/"
-  }
+onMounted(async () => {
   incidents.value = await loadIncidents()
 })
 
 const filterStatus = ref('')
 const service = ref('')
 const filteredIncidents = computed(() => {
-  let filteredIncidents = incidents.value
-  if (service.value.trim() != '') {
-    filteredIncidents = incidents.value.filter((inc)=>inc.service.includes(service.value.trim()))
+  let result = incidents.value
+  if (service.value.trim() !== '') {
+    result = result.filter((inc) => inc.service.includes(service.value.trim()))
   }
-  if (filterStatus.value != '') {
-    filteredIncidents = incidents.value.filter((inc)=>inc.status == filterStatus.value)
+  if (filterStatus.value !== '') {
+    result = result.filter((inc) => inc.status === filterStatus.value)
   }
-
-  return filteredIncidents
+  return result
 })
 </script>
 
 <template>
   <main>
-    <AppHeader></AppHeader>
     <div class="page">
       <div class="dash-head">
         <div>

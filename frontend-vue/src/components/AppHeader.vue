@@ -3,13 +3,17 @@ import { logout, whoAmI } from '@/api';
 import type { UserContext } from '@/types';
 import { makeEmptyUserContext } from '@/utils/user';
 import { onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router'
+import { useAuth } from '@/stores/auth'
+
+const router = useRouter()
+const auth = useAuth() 
 
 async function handleLogout() {
-    await logout()
-    window.location.href = "/"
+  await logout()
+  auth.clear()
+  router.push({ name: 'log-in' })
 }
-
-const identity = ref<UserContext>(makeEmptyUserContext())
 
 const currentTime = ref('')
 let timer: ReturnType<typeof setInterval> | undefined
@@ -22,21 +26,13 @@ function updateTime() {
     })
 }
 
-onMounted(async () => {
+onMounted(() => {
+  updateTime()
+  const msToNextMinute = 60000 - (Date.now() % 60000)
+  timer = setTimeout(() => {
     updateTime()
-    // align to the next minute boundary, then tick every minute
-    const msToNextMinute = 60000 - (Date.now() % 60000)
-    timer = setTimeout(() => {
-        updateTime()
-        timer = setInterval(updateTime, 60000)
-    }, msToNextMinute)
-
-    try {
-        identity.value = await whoAmI()
-    } catch (e) {
-        alert('Something is wrong.\n' + (e as Error).message)
-        window.location.href = "/"
-    }
+    timer = setInterval(updateTime, 60000)
+  }, msToNextMinute)
 })
 
 onUnmounted(() => {
@@ -49,12 +45,12 @@ onUnmounted(() => {
 <template>
     <header class="appbar">
         <div class="appbar-inner">
-            <RouterLink :to="{name: 'entry'}" class="brand">
+            <RouterLink :to="{path: '/'}" class="brand">
                 <span class="brand-name">HANDOFF</span>
                 <span class="brand-mark">//</span>
             </RouterLink>
             <nav class="appbar-nav">
-                <RouterLink :to="{name: 'incidents'}" class="nav-link">Incidents</RouterLink>
+                <RouterLink :to="{path: '/'}" class="nav-link">Incidents</RouterLink>
             </nav>
 
 
@@ -62,8 +58,8 @@ onUnmounted(() => {
 
             <span class="current-time mono">🕞 {{ currentTime }}</span>
             <div class="appbar-user">
-                <span class="user-name mono"> {{ identity.username }}</span>
-                <span class="user-role">{{identity.role}}</span>
+                <span class="user-name mono"> {{ auth.user?.username }}</span>
+                <span class="user-role">{{auth.user?.role}}</span>
             </div>
             <button class="btn appbar-logout" @click="handleLogout">Log out</button>
         </div>

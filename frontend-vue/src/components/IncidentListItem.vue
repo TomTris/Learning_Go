@@ -40,7 +40,7 @@ const created_at = computed(()=> formatAge(props.inc.created_at, now.value))
                     </span>
                     <span class="meta-item">
                         <span class="meta-key">opened by</span>
-                        <span class="mono">{{ inc.service }}</span>
+                        <span class="mono">{{ inc.opened_by }}</span>
                     </span>
                 </div>
             </div>

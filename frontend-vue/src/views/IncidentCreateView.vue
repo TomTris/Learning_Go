@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { createIncident, logout } from '@/api';
-import AppHeader from '@/components/AppHeader.vue';
 import type { CreateIncidentRequest, Severity } from '@/types';
 import { ref } from 'vue';
 
@@ -47,7 +46,6 @@ async function handleCreateIncident() {
 
 <template>
     <main>
-         <AppHeader></AppHeader>
         <div class="page narrow">
             <RouterLink :to="{name:'incidents'}" class="back mono">← Back to incident</RouterLink>
             <p class="eyebrow">Declare</p>

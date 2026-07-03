@@ -8,6 +8,7 @@ interface ApiError {
 }
 
 export async function isAuthenticated(): Promise<boolean> {
+    console.log(1)
     const res = await fetch("/api/auth/isauthenticated", {
         credentials: "include"
     });
@@ -19,6 +20,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
         credentials: "include",
         ...init,
     })
+
     if (res.status == 204) {
         return undefined as T
     }

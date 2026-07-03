@@ -67,7 +67,7 @@ async function handleRegistration()  {
                  <div v-if="role === 'admin'" class="field">
                     <label class="field-label">Admin Token</label>
                     <input class="input" type="password" v-model="adminToken" placeholder="●●●●●●●●" autocomplete="off" required>
-                    <p class="field-hint">Admin Token is "adminTokenIncidentHandoff"</p>
+                    <p class="field-hint">for trial use: Admin Token is "adminTokenIncidentHandoff"</p>
 
                 </div>
                 <button class="btn btn-primary btn-block" type="submit">Register</button>

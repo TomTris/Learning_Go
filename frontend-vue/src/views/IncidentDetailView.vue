@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { addEntry, getIncident, updateIncident, whoAmI, } from '@/api';
-import type { Incident, IncidentStatus, Severity, TimelineEntryType, UserContext } from '@/types';
+import { addEntry, getIncident, updateIncident, } from '@/api';
+import type { Incident, IncidentStatus, Severity, TimelineEntryType } from '@/types';
 import { useRoute } from 'vue-router';
-import AppHeader from '@/components/AppHeader.vue';
 import SeverityBadge from '@/components/SeverityBadge.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import PanelCatchup from '@/components/PanelCatchup.vue';
@@ -10,7 +9,6 @@ import TimelineEntryCard from '@/components/TimelineEntryCard.vue';
 import AddEntry from '@/components/AddEntry.vue';
 import DetailSide from '@/components/DetailSide.vue';
 import { onMounted, ref } from 'vue';
-import { makeEmptyUserContext } from '@/utils/user';
 
 const route = useRoute()
 const inc = ref<Incident | undefined>()
@@ -71,7 +69,6 @@ async function handleIncidentUpdate(payload: {severity: Severity, status: Incide
 
 <template>
     <div>
-        <AppHeader></AppHeader>
         <p class="error">{{ errIncidentLoadingMsg }}</p>
         <div class="page">
             <RouterLink :to="{name:'incidents'}" class="back mono">← Back to incident</RouterLink>

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { login, whoAmI } from '@/api.ts';
+import { login } from '@/api.ts';
+import { useRouter } from 'vue-router';
+import { useAuth } from '@/stores/auth';
+
+const router = useRouter()
+const auth = useAuth()
 
 const error = ref('')
 const username = ref('')
@@ -9,7 +14,8 @@ async function handleLogin()  {
     error.value = ''
     try {
       await login(username.value, password.value)
-      window.location.href = "/incidents"
+      await auth.load()
+      router.push({name: 'incidents'})
     } catch (e) {
       error.value = (e as Error).message ?? 'Authentication failed'
     }
