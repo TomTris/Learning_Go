@@ -1,4 +1,4 @@
-import type { Incident, CreateIncidentRequest, Severity, TimelineEntry, UserContext, IncidentStatus, TimelineEntryType } from "./types.js";
+import type { Incident, CreateIncidentRequest, Severity, TimelineEntry, UserContext, IncidentStatus, TimelineEntryType, OnCallShiftEntry } from "./types.js";
 
 interface ApiError {
     error: {
@@ -91,4 +91,36 @@ export async function updateIncident(id: string, payload: { severity: Severity, 
         method: "PATCH",
         body: JSON.stringify(payload),
     })
+}
+
+export async function listOnCalls(from?: string, to?: string): Promise<OnCallShiftEntry[]> {
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    const qs = params.toString()
+    return await request<OnCallShiftEntry[]>(`/api/oncall${qs ? '?' + qs : ''}`, undefined)
+}
+
+export async function currentOnCall(service: string): Promise<{ username: string }> {
+    return await request<{ username: string }>(`/api/oncall/current?service=${encodeURIComponent(service)}`, undefined)
+}
+
+export async function createShift(entry: Omit<OnCallShiftEntry, 'id'>): Promise<OnCallShiftEntry> {
+    return await request<OnCallShiftEntry>('/admin/oncall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+    })
+}
+
+export async function updateShift(id: string, entry: Omit<OnCallShiftEntry, 'id'>): Promise<OnCallShiftEntry> {
+    return await request<OnCallShiftEntry>(`/admin/oncall/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+    })
+}
+
+export async function currentOnCallAll(): Promise<OnCallShiftEntry[]> {
+    return await request<OnCallShiftEntry[]>('/api/oncall/current/all', undefined)
 }

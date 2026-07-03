@@ -11,6 +11,7 @@ import (
 type OnCallStore interface {
 	Create(ctx context.Context, entry OnCallShiftEntry) (OnCallShiftEntry, error)
 	CurrentOnCall(ctx context.Context, service string) (string, error)
+	CurrentOnCallAll(ctx context.Context) ([]OnCallShiftEntry, error)
 	ListOnCalls(ctx context.Context, from *time.Time, to *time.Time) ([]OnCallShiftEntry, error) //minute-exact
 	UpdateOnCall(ctx context.Context, updatedEntry OnCallShiftEntry) (OnCallShiftEntry, error)
 }

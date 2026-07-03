@@ -59,6 +59,7 @@ func getRouter(
 	admin.HandleFunc("POST /oncall", ResponseMiddleware(AuthAdminOnlyMiddleware(onCallHandler.CreateShift)))
 	admin.HandleFunc("PATCH /oncall/{id}", ResponseMiddleware(AuthAdminOnlyMiddleware(onCallHandler.UpdateShift)))
 	protected.HandleFunc("GET /oncall/current", ResponseMiddleware(onCallHandler.CurrentOnCall))
+	protected.HandleFunc("GET /oncall/current/all", ResponseMiddleware(onCallHandler.CurrentOnCallAll))
 	protected.HandleFunc("GET /oncall", ResponseMiddleware(onCallHandler.ListOnCalls))
 
 	// metrics, health and ready

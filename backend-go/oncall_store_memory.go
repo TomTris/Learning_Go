@@ -45,6 +45,20 @@ func (s *InMemoryOnCallStore) CurrentOnCall(ctx context.Context, service string)
 	return "", OnCallShiftEntryNotFound
 }
 
+func (s *InMemoryOnCallStore) CurrentOnCallAll(ctx context.Context) ([]OnCallShiftEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	now := time.Now()
+	entries := []OnCallShiftEntry{}
+	for _, e := range s.OnCallEntries {
+		if !e.StartsAt.After(now) && e.EndsAt.After(now) { // start <= now < end
+			entries = append(entries, e)
+		}
+	}
+	return entries, nil
+}
+
 func (s *InMemoryOnCallStore) ListOnCalls(ctx context.Context, from *time.Time, to *time.Time) ([]OnCallShiftEntry, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

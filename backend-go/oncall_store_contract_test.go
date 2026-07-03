@@ -198,6 +198,71 @@ func onCallStoreContract(t *testing.T, newStore func() OnCallStore) {
 			t.Fatalf("expected OnCallShiftEntryNotFound, got %v", err)
 		}
 	})
+
+	t.Run("CurrentOnCallAll returns all active shifts across services", func(t *testing.T) {
+		store := newStore()
+
+		// active on two different services
+		if _, err := store.Create(ctx, OnCallShiftEntry{
+			Service: "payment", Username: "tom",
+			StartsAt: base.Add(-1 * time.Hour), EndsAt: base.Add(1 * time.Hour),
+		}); err != nil {
+			t.Fatalf("seed payment: %v", err)
+		}
+		if _, err := store.Create(ctx, OnCallShiftEntry{
+			Service: "web", Username: "jerry",
+			StartsAt: base.Add(-30 * time.Minute), EndsAt: base.Add(30 * time.Minute),
+		}); err != nil {
+			t.Fatalf("seed web: %v", err)
+		}
+		// expired — must be excluded
+		if _, err := store.Create(ctx, OnCallShiftEntry{
+			Service: "api", Username: "old",
+			StartsAt: base.Add(-2 * time.Hour), EndsAt: base.Add(-1 * time.Hour),
+		}); err != nil {
+			t.Fatalf("seed expired: %v", err)
+		}
+		// future — must be excluded
+		if _, err := store.Create(ctx, OnCallShiftEntry{
+			Service: "api", Username: "next",
+			StartsAt: base.Add(1 * time.Hour), EndsAt: base.Add(2 * time.Hour),
+		}); err != nil {
+			t.Fatalf("seed future: %v", err)
+		}
+
+		got, err := store.CurrentOnCallAll(ctx)
+		if err != nil {
+			t.Fatalf("CurrentOnCallAll: %v", err)
+		}
+		// only the two active shifts
+		assertUsernames(t, got, "tom", "jerry")
+	})
+
+	t.Run("CurrentOnCallAll empty when nothing active", func(t *testing.T) {
+		store := newStore()
+
+		// one expired, one future — neither active now
+		if _, err := store.Create(ctx, OnCallShiftEntry{
+			Service: "web", Username: "past",
+			StartsAt: base.Add(-2 * time.Hour), EndsAt: base.Add(-1 * time.Hour),
+		}); err != nil {
+			t.Fatalf("seed past: %v", err)
+		}
+		if _, err := store.Create(ctx, OnCallShiftEntry{
+			Service: "web", Username: "future",
+			StartsAt: base.Add(1 * time.Hour), EndsAt: base.Add(2 * time.Hour),
+		}); err != nil {
+			t.Fatalf("seed future: %v", err)
+		}
+
+		got, err := store.CurrentOnCallAll(ctx)
+		if err != nil {
+			t.Fatalf("CurrentOnCallAll: %v", err)
+		}
+		if len(got) != 0 {
+			t.Fatalf("expected 0 active, got %d: %+v", len(got), got)
+		}
+	})
 }
 
 func seedThree(t *testing.T, ctx context.Context, store OnCallStore, base time.Time) {

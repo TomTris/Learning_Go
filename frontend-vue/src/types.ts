@@ -1,9 +1,11 @@
-export type Severity = 
+export type ISODateString = string
+
+export type Severity =
     | "SEV1"
     | "SEV2"
     | "SEV3";
 
-export type IncidentStatus = 
+export type IncidentStatus =
     | "triggered"
     | "acknowledged"
     | "investigating"
@@ -18,11 +20,11 @@ export type TimelineEntryType =
     | "state_change";
 
 export interface TimelineEntry {
-	id: string;
-	author: string;
-	type: TimelineEntryType;
-	text: string;
-	created_at: string;
+    id: string;
+    author: string;
+    type: TimelineEntryType;
+    text: string;
+    created_at: ISODateString;
 }
 
 export interface Incident {
@@ -33,20 +35,28 @@ export interface Incident {
     status: IncidentStatus;
     opened_by: string;
     on_call: string;
-    created_at: string;
-    updated_at: string;
+    created_at: ISODateString;
+    updated_at: ISODateString;
     entries: TimelineEntry[];
     version: number;
 }
 
 export interface CreateIncidentRequest {
-	title:    string
-	service:  string
-	severity: Severity
+    title: string
+    service: string
+    severity: Severity
 }
 
 export interface UserContext {
-	id:       string
-	username: string
-	role:     string
+    id: string
+    username: string
+    role: string
+}
+
+export interface OnCallShiftEntry {
+    id: string;
+    service: string;
+    username: string;
+    starts_at: ISODateString;
+    ends_at: ISODateString;
 }

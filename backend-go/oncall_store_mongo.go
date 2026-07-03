@@ -53,6 +53,23 @@ func (s *MongoOnCallStore) CurrentOnCall(ctx context.Context, service string) (s
 	return entry.Username, nil
 }
 
+func (s *MongoOnCallStore) CurrentOnCallAll(ctx context.Context) ([]OnCallShiftEntry, error) {
+	now := time.Now()
+	filter := bson.M{
+		"starts_at": bson.M{"$lte": now},
+		"ends_at":   bson.M{"$gt": now},
+	}
+	cursor, err := s.col.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "service", Value: 1}}))
+	if err != nil {
+		return nil, fmt.Errorf("current on-call all query error: %w", err)
+	}
+	entries := []OnCallShiftEntry{}
+	if err := cursor.All(ctx, &entries); err != nil {
+		return nil, fmt.Errorf("current on-call all decode error: %w", err)
+	}
+	return entries, nil
+}
+
 func (s *MongoOnCallStore) ListOnCalls(ctx context.Context, from *time.Time, to *time.Time) ([]OnCallShiftEntry, error) {
 	filter := bson.M{}
 

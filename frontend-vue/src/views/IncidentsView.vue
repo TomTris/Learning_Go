@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { loadIncidents } from '@/api';
 import IncidentListItem from '@/components/IncidentListItem.vue';
+import { useAuth } from '@/stores/auth';
 import type { Incident } from '@/types';
 import { computed, onMounted, ref } from 'vue';
+
+const auth = useAuth()
+const isAdmin = computed(() => auth.user?.role === 'admin')
 
 const incidents = ref<Incident[]>([])
 
@@ -33,7 +37,8 @@ const filteredIncidents = computed(() => {
           <h1 class="page-title">Incidents</h1>
         </div>
         <div class="spacer"></div>
-        <RouterLink :to="{name: 'incidents-new'}" class="btn btn-primary">+ New Incident</RouterLink>
+        <RouterLink v-if="isAdmin" :to="{ name: 'oncall' }" class="btn">Manage on-call</RouterLink>
+        <RouterLink :to="{ name: 'incidents-new' }" class="btn btn-primary">+ New Incident</RouterLink>
       </div>
 
       <div class="filters">
@@ -66,9 +71,11 @@ const filteredIncidents = computed(() => {
 </template>
 
 <style scoped>
+
 .dash-head {
   align-items: flex-end;
   display: flex;
+  gap: 10px;
   margin-bottom: 24px;
 }
 
@@ -107,4 +114,5 @@ const filteredIncidents = computed(() => {
   }
 
 }
+
 </style>

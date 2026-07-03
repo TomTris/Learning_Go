@@ -8,3 +8,5 @@ cover.out
 frontend/**/node_modules
 frontend/public/dist
 backend-go/handoff
+
+.DS_Store

@@ -69,6 +69,14 @@ func (h *OnCallHandler) CurrentOnCall(r *http.Request) (*AppResponse, *AppError)
 	return newAppResponse(http.StatusOK, map[string]string{"username": username}), nil
 }
 
+func (h *OnCallHandler) CurrentOnCallAll(r *http.Request) (*AppResponse, *AppError) {
+	entries, err := h.Store.CurrentOnCallAll(r.Context())
+	if err != nil {
+		return nil, InternalServerError(err)
+	}
+	return newAppResponse(http.StatusOK, entries), nil
+}
+
 func (h *OnCallHandler) ListOnCalls(r *http.Request) (*AppResponse, *AppError) {
 	startsAt, err := parseTimeQuery(r, "from")
 	if err != nil {

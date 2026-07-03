@@ -13,6 +13,7 @@ const router = createRouter({
         { path: 'incidents', name: 'incidents', component: () => import('@/views/IncidentsView.vue') },
         { path: 'incidents/new', name: 'incidents-new', component: () => import('@/views/IncidentCreateView.vue') },
         { path: 'incidents/:id', name: 'incident-detail', component: () => import('@/views/IncidentDetailView.vue') },
+        { path: 'oncall', name: 'oncall', component: () => import('@/views/OnCallView.vue') },
       ],
     },
     {
