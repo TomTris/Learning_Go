@@ -10,3 +10,4 @@ frontend/public/dist
 backend-go/handoff
 
 .DS_Store
+clean_db
